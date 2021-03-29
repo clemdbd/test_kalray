@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <png.h>
 
@@ -158,7 +159,7 @@ write_png_file(char *file_name, struct decoded_image *img)
 
 
 static int
-process_file(struct decoded_image *img)
+process_file(struct decoded_image *img, bool b_apply_weight, float red_val, float green_val, float blue_val)
 {
 	printf("Checking PNG format\n");
 
@@ -176,7 +177,14 @@ process_file(struct decoded_image *img)
 	      png_byte *row = img->row_pointers[y];
 	      png_byte *ptr = &(row[x * 4]);
 	      /* set red value to 0 */
-	      ptr[0]  = 0;
+		  if (b_apply_weight)
+		  {
+			  ptr[0] *= red_val;
+		  }
+		  else
+		  {
+			  ptr[0]  = 0;
+		  }
 	    }
 	}
 
@@ -187,7 +195,16 @@ process_file(struct decoded_image *img)
 			png_byte *row = img->row_pointers[y];
 			png_byte *ptr = &(row[x * 4]);
 			/* Then set green value to the blue one */
-			ptr[1]  = ptr[2];
+
+			if (!b_apply_weight)
+			{
+			    ptr[1] = ptr[2];
+			}
+			else
+			{
+				ptr[1] *= green_val;
+				ptr[2] *= blue_val;
+			}
 		}
 	}
 	printf("Processing done\n");
@@ -197,20 +214,33 @@ process_file(struct decoded_image *img)
 	return 0;
 }
 
-
-
 int
 main(int argc, char **argv)
 {
-	if (argc != 3)
-		abort_("Usage: program_name <file_in> <file_out>");
+	float red_v = 0;
+	float green_v = 0;
+	float blue_v = 0;
+	bool apply_weight = false;
+	
+	if ( (argc != 3) && (argc != 6))
+		abort_("Usage: program_name <file_in> <file_out> [<red_value> <green_value> <blue_value>]");
 
 	struct decoded_image *img = malloc(sizeof(struct decoded_image));
 
 	printf("Reading input PNG\n");
 	read_png_file(argv[1], img);
 
-	process_file(img);
+	if (argc == 6)
+	{
+		red_v = atof(argv[3]);
+		green_v = atof(argv[4]);
+		blue_v = atof(argv[5]);
+		apply_weight = true;
+		
+		printf("Params: %f %f %f\n", red_v, green_v, blue_v);
+	}
+	
+	process_file(img, apply_weight, red_v, green_v, blue_v);
 
 	printf("Writing output PNG\n");
 	write_png_file(argv[2], img);
