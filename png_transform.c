@@ -42,12 +42,17 @@ void
 read_png_file(char *file_name, struct decoded_image *img)
 {
 	char header[8];        // 8 is the maximum size that can be checked
+	size_t rsize;	// read size
 
 	/* open file and test for it being a png */
 	FILE *fp = fopen(file_name, "rb");
 	if (!fp)
 		abort_("[read_png_file] File %s could not be opened for reading", file_name);
-	fread(header, 1, 8, fp);
+		
+	rsize = fread(header, 1, 8, fp);
+	if (rsize < 8u)
+		abort_("[read_png_file] Read file %s has filed (%d byte read)", file_name, rsize);
+		
 	if (png_sig_cmp((png_const_bytep)header, 0, 8))
 		abort_("[read_png_file] File %s is not recognized as a PNG file", file_name);
 
@@ -158,8 +163,10 @@ process_file(struct decoded_image *img)
 	printf("Checking PNG format\n");
 
 	if (png_get_color_type(img->png_ptr, img->info_ptr) != PNG_COLOR_TYPE_RGBA)
+	{
 		printf("[process_file] color_type of input file must be PNG_COLOR_TYPE_RGBA (%d) (is %d)", PNG_COLOR_TYPE_RGBA, png_get_color_type(img->png_ptr, img->info_ptr));
 		return 1;
+	}
 
 	printf("Starting processing\n");
 	for (x = 0; x < img->w; x++)
