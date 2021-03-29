@@ -170,18 +170,20 @@ process_file(struct decoded_image *img)
 
 	printf("Starting processing\n");
 	for (x = 0; x < img->w; x++)
-	  {
-	  for (y = 0; y < img->w; y++)
+	{
+	    for (y = 0; y < img->h; y++)
 	    {
 	      png_byte *row = img->row_pointers[y];
 	      png_byte *ptr = &(row[x * 4]);
 	      /* set red value to 0 */
 	      ptr[0]  = 0;
 	    }
-	  }
+	}
 
-	for (x = 0; x < img->w; x++) {
-		for (y = 0; y < img->w; y++) {
+	for (x = 0; x < img->w; x++) 
+	{
+		for (y = 0; y < img->h; y++) 
+		{
 			png_byte *row = img->row_pointers[y];
 			png_byte *ptr = &(row[x * 4]);
 			/* Then set green value to the blue one */
