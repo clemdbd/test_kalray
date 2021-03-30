@@ -15,6 +15,13 @@
 
 #include <png.h>
 
+typedef enum {
+	transf_default = 0,
+	transf_colors_weight,
+	
+	/* Add new transformation type below */
+} e_transform_type;
+
 void
 abort_(const char *s, ...)
 {
@@ -158,9 +165,51 @@ write_png_file(char *file_name, struct decoded_image *img)
 }
 
 
-static int
-process_file(struct decoded_image *img, bool b_apply_weight, float red_val, float green_val, float blue_val)
+/* Apply default transformation */
+static int process_default_transf(struct decoded_image *img)
 {
+	printf("Apply default transformation\n");
+	for (x = 0; x < img->w; x++)
+	{
+	    for (y = 0; y < img->h; y++)
+	    {
+	      png_byte *row = img->row_pointers[y];
+	      png_byte *ptr = &(row[x * 4]);
+		  
+		  /* set red value to 0 and green value to blue value*/
+		  ptr[0]  = 0;
+		  ptr[1] = ptr[2];
+	    }
+	}
+
+	return 0;
+}
+
+/* Apply colors weight transformation */
+static int process_colors_weight_tranf(struct decoded_image *img, float red_val, float green_val, float blue_val)
+{
+	printf("Apply colors weight transformation \n");
+	for (x = 0; x < img->w; x++)
+	{
+	    for (y = 0; y < img->h; y++)
+	    {
+	      png_byte *row = img->row_pointers[y];
+	      png_byte *ptr = &(row[x * 4]);
+		  
+		  /* Apply weight colours*/
+		  ptr[0] *= red_val;
+		  ptr[1] *= green_val;
+		  ptr[2] *= blue_val;
+	    }
+	}
+
+	return 0;
+}
+
+static int
+process_file(struct decoded_image *img, e_transform_type transf_type, float red_val, float green_val, float blue_val)
+{
+	int res = 0;
 	printf("Checking PNG format\n");
 
 	if (png_get_color_type(img->png_ptr, img->info_ptr) != PNG_COLOR_TYPE_RGBA)
@@ -169,50 +218,25 @@ process_file(struct decoded_image *img, bool b_apply_weight, float red_val, floa
 		return 1;
 	}
 
-	printf("Starting processing\n");
-	for (x = 0; x < img->w; x++)
+	switch (transf_type)
 	{
-	    for (y = 0; y < img->h; y++)
-	    {
-	      png_byte *row = img->row_pointers[y];
-	      png_byte *ptr = &(row[x * 4]);
-	      /* set red value to 0 */
-		  if (b_apply_weight)
-		  {
-			  ptr[0] *= red_val;
-		  }
-		  else
-		  {
-			  ptr[0]  = 0;
-		  }
-	    }
+		case transf_colors_weight:
+			res = process_colors_weight_tranf(img, red_val, green_val, blue_val);
+			break;
+		
+        case transf_default:		
+		default:
+			res = process_default_transf(img);
+			break;
 	}
 
-	for (x = 0; x < img->w; x++) 
-	{
-		for (y = 0; y < img->h; y++) 
-		{
-			png_byte *row = img->row_pointers[y];
-			png_byte *ptr = &(row[x * 4]);
-			/* Then set green value to the blue one */
-
-			if (!b_apply_weight)
-			{
-			    ptr[1] = ptr[2];
-			}
-			else
-			{
-				ptr[1] *= green_val;
-				ptr[2] *= blue_val;
-			}
-		}
-	}
 	printf("Processing done\n");
 
 	png_destroy_read_struct(&img->png_ptr, &img->info_ptr, NULL);
 
-	return 0;
+	return res;
 }
+
 
 int
 main(int argc, char **argv)
@@ -220,27 +244,42 @@ main(int argc, char **argv)
 	float red_v = 0;
 	float green_v = 0;
 	float blue_v = 0;
-	bool apply_weight = false;
+	e_transform_type transf_type = transf_default;
 	
-	if ( (argc != 3) && (argc != 6))
-		abort_("Usage: program_name <file_in> <file_out> [<red_value> <green_value> <blue_value>]");
-
+	if (argc < 3)
+		abort_("Usage: program_name <file_in> <file_out> [<transform_type> <transf_arg1> ...]");
+		
+	if (argc >= 4)
+	{
+	    transf_type = (e_transform_type) atoi(argv[3]);
+		/* Check Arguments */
+		if (transf_type == transf_colors_weight)
+		{
+			if (argc < 7)
+			{
+				abort_("Colors Weight Transformation selected: Missing Arguments! usage : program_name <file_in> <file_out> 1 <red_val> <green_val> <blue_val>");
+			}
+			else
+			{
+			    printf("Colors Weight Transformation\n");
+				red_v = atof(argv[4]);
+				green_v = atof(argv[5]);
+				blue_v = atof(argv[6]);
+			}
+		}
+		else
+		{
+			printf("Default Transformation\n");
+		}
+	}
+	
 	struct decoded_image *img = malloc(sizeof(struct decoded_image));
 
 	printf("Reading input PNG\n");
 	read_png_file(argv[1], img);
-
-	if (argc == 6)
-	{
-		red_v = atof(argv[3]);
-		green_v = atof(argv[4]);
-		blue_v = atof(argv[5]);
-		apply_weight = true;
-		
-		printf("Params: %f %f %f\n", red_v, green_v, blue_v);
-	}
 	
-	process_file(img, apply_weight, red_v, green_v, blue_v);
+	/* process transformation */
+	process_file(img, transf_type, red_v, green_v, blue_v);
 
 	printf("Writing output PNG\n");
 	write_png_file(argv[2], img);
